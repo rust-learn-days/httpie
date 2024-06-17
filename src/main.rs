@@ -76,7 +76,7 @@ async fn main() -> Result<(), anyhow::Error> {
     headers.insert(header::ACCEPT, header::HeaderValue::from_static("*/*"));
     headers.insert(header::USER_AGENT, header::HeaderValue::from_static("rust-client"));
     env_logger::init();
-    let client = Client::builder().no_proxy().danger_accept_invalid_certs(true).default_headers(headers).build()?;
+    let client = Client::builder().no_proxy().default_headers(headers).build()?;
     let result = match opts.subcmd {
         SubCommand::Get(ref args) => get(client, args).await?,
         SubCommand::Post(ref args) => post(client, args).await?,
