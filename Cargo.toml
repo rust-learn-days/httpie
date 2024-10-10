@@ -6,3 +6,15 @@ edition = "2021"
 description = "httpie, a rusty-hermit application"
 repository = "https://github.com/rust-learn-days/httpie"
 [dependencies]
+clap = { version = "3.0.14", features = ["derive"] }
+anyhow = "1"
+colored = "2.1.0"
+jsonxf = "1.1"
+mime = "0.3"
+tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "macros"] }
+reqwest = { version = "0.11", features = ["json"] ,default-features = false}
+env_logger = "0.11.3"
+
+[[bin]]
+name = "httpie"
+path = "src/main.rs"
