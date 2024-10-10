@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::process::exit;
 use std::str::FromStr;
 
 use clap::Parser;
@@ -12,6 +13,8 @@ use reqwest::{header, Client, Response};
 struct Opts {
     #[clap(subcommand)]
     subcmd: SubCommand,
+    #[clap(short, long, default_value = "0")]
+    code: u16,
 }
 
 #[derive(Parser)]
@@ -87,24 +90,24 @@ async fn main() -> Result<(), anyhow::Error> {
         .default_headers(headers)
         .build()?;
     let result = match opts.subcmd {
-        SubCommand::Get(ref args) => get(client, args).await?,
-        SubCommand::Post(ref args) => post(client, args).await?,
+        SubCommand::Get(ref args) => get(client, args, opts.code).await?,
+        SubCommand::Post(ref args) => post(client, args, opts.code).await?,
     };
     Ok(result)
 }
 #[allow(clippy::needless_question_mark)]
-async fn get(client: Client, args: &Get) -> Result<(), anyhow::Error> {
+async fn get(client: Client, args: &Get, code: u16) -> Result<(), anyhow::Error> {
     let res = client.get(&args.url).send().await?;
-    Ok(print_resp(res).await?)
+    Ok(print_resp(res, code).await?)
 }
 #[allow(clippy::needless_question_mark)]
-async fn post(client: Client, args: &Post) -> Result<(), anyhow::Error> {
+async fn post(client: Client, args: &Post, code: u16) -> Result<(), anyhow::Error> {
     let mut body = HashMap::new();
     for kv in args.body.iter() {
         body.insert(&kv.key, &kv.value);
     }
     let res = client.post(&args.url).json(&body).send().await?;
-    Ok(print_resp(res).await?)
+    Ok(print_resp(res, code).await?)
 }
 
 fn print_status(res: &Response) {
@@ -135,15 +138,26 @@ fn print_body(m: Option<Mime>, body: &String) {
 }
 
 //
-async fn print_resp(res: Response) -> Result<(), anyhow::Error> {
+async fn print_resp(res: Response, code: u16) -> Result<(), anyhow::Error> {
     if res.status().is_client_error() {
-        println!("Error Client Status: {:?}", res.status());
+        println!(
+            "{}",
+            format!("Error Client Status: {:?}", res.status()).red()
+        );
     }
+
     if res.status().is_server_error() {
-        println!("Error Server Status: {:?}", res.status());
+        println!(
+            "{}",
+            format!("Error Server Status: {:?}", res.status()).red()
+        );
     }
+
     print_status(&res);
     print_headers(&res);
+    if code != 0 && res.status().as_u16() != code {
+        exit(1)
+    }
     let m = get_content_type(&res);
     match res.text().await {
         Ok(body) => print_body(m, &body),
