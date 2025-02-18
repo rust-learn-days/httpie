@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::process::exit;
 use std::str::FromStr;
 
@@ -27,6 +28,16 @@ enum SubCommand {
 struct Get {
     #[clap(parse(try_from_str = parse_url))]
     url: String,
+    #[clap(parse(try_from_str = verify_file ), default_value = "-")]
+    file: String,
+}
+
+fn verify_file(path: &str) -> Result<String, String> {
+    if path == "-" || Path::new(path).exists() {
+        Ok(path.to_string())
+    } else {
+        Err("File not found".to_string())
+    }
 }
 
 fn parse_url(s: &str) -> Result<String, String> {
@@ -97,8 +108,32 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 #[allow(clippy::needless_question_mark)]
 async fn get(client: Client, args: &Get, code: u16) -> Result<(), anyhow::Error> {
-    let res = client.get(&args.url).send().await?;
-    Ok(print_resp(res, code).await?)
+    if args.file == "-" {
+        let res = client.get(&args.url).send().await?;
+        return Ok(print_resp(res, code).await?);
+    }
+    let mut urls = Vec::new();
+    let file = std::fs::read_to_string(&args.file)?;
+    for line in file.lines() {
+        let url = line.trim();
+        if url.is_empty() {
+            continue;
+        }
+        if url.starts_with("#") {
+            continue;
+        }
+        println!("get url is: {}", url);
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            eprintln!("URL must start with http:// or https://");
+            continue;
+        }
+        urls.push(url);
+    }
+    for url in urls {
+        let res = client.get(url).send().await?;
+        print_resp(res, code).await?;
+    }
+    Ok(())
 }
 #[allow(clippy::needless_question_mark)]
 async fn post(client: Client, args: &Post, code: u16) -> Result<(), anyhow::Error> {
@@ -125,7 +160,7 @@ fn print_headers(res: &Response) {
     }
     println!("\n")
 }
-
+#[allow(clippy::ptr_arg)]
 fn print_body(m: Option<Mime>, body: &String) {
     match m {
         Some(v) if v.type_() == mime::APPLICATION && v.subtype() == mime::JSON => {
